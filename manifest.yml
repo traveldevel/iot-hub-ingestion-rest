@@ -1,0 +1,8 @@
+applications:
+ - name: hello-world-api
+   memory: 64M
+   command: node index.js
+   buildpack: https://github.com/cloudfoundry/nodejs-buildpack
+   env:
+    landscapeName: shared1
+    tenantName: own

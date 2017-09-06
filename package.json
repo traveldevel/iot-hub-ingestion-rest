@@ -1,0 +1,38 @@
+{
+  "name": "iot-hub-ingestion-rest",
+  "version": "0.1.0",
+  "description": "ingestion",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/traveldevel/iot-hub-ingestion-rest.git"
+  },
+  "keywords": [
+    "iot",
+    "hub",
+    "ingestion",
+    "kafka",
+    "consumer",
+    "rest",
+    "api"
+  ],
+  "author": "www.traveldevel.ro",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/traveldevel/iot-hub-ingestion-rest/issues"
+  },
+  "homepage": "https://github.com/traveldevel/iot-hub-ingestion-rest#readme",
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "cfenv": "^1.0.4",
+    "chai": "^4.1.1",
+    "express": "^4.15.3",
+    "mocha": "^3.5.0",
+    "querystring": "^0.2.0",
+    "request": "^2.81.0",
+    "request-promise": "^4.2.1"
+  }
+}
