@@ -1,6 +1,7 @@
 applications:
  - name: iot-hub-ingestion-rest
    memory: 64M
+   disk_quota: 128M
    command: node index.js
    buildpack: https://github.com/cloudfoundry/nodejs-buildpack
    env:
