@@ -1,5 +1,5 @@
 applications:
- - name: hello-world-api
+ - name: iot-hub-ingestion-rest
    memory: 64M
    command: node index.js
    buildpack: https://github.com/cloudfoundry/nodejs-buildpack
