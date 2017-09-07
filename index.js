@@ -23,16 +23,27 @@ var mongoServiceName = "mongo_" + landscapeName;
 var mongoService = appEnv.getService(mongoServiceName);
 var mongoCredentials = appEnv.getServiceCreds(mongoServiceName);
 var mongoUrl = mongoCredentials.uri;
-var mongoClient = require('mongodb');
+var mongoClient = require('mongodb').MongoClient;
+var mongoCA = [new Buffer(mongoCredentials.ca_certificate_base64, 'base64')];
+
 var colections = [];
 
 console.log(mongoServiceName + " found in VCAP_SERVICES : ")
 console.log(mongoService);
 
-mongoClient.connect(mongoUrl, function(err, mongoDb) {
+mongoClient.connect(mongoUrl, {
+    mongos: {
+        ssl: true,
+        sslValidate: true,
+        sslCA: mongoCA,
+        poolSize: 10,
+        reconnectTries: 5
+    }
+},
+function(err, mongoDb) {
     
     console.log("Connected to mongo...");
-   
+
     colections = mongoDb.collections();
     
     var exists = false;
@@ -42,13 +53,16 @@ mongoClient.connect(mongoUrl, function(err, mongoDb) {
 
     if (!exists) {
         mongoDb.createCollection(tenantNameMongoName, function(err, res) {
-            if (err) throw err;
+            
+            if (err) {
+                console.log(err);
+            }
+
             console.log("Collection '" + tenantNameMongoName + "' created!");
             colections = mongoDb.collections();
             mongoDb.close();
         });
     }
-   
 });
 
 // new express app
