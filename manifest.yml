@@ -3,7 +3,6 @@ applications:
    memory: 64M
    disk_quota: 128M
    instances: 2
-   command: node index.js
    buildpack: https://github.com/cloudfoundry/nodejs-buildpack
    env:
     landscapeName: shared
