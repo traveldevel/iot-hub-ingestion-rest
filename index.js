@@ -19,7 +19,7 @@ var tenantName = process.env.tenantName;
 var tenantNameMongoName = tenantName + "_raw_data";
 
 // mongo connect and create missing collections
-var mongoServiceName = "mongo_" + landscapeName;
+var mongoServiceName = "iot_hub_mongo_" + landscapeName;
 var mongoService = appEnv.getService(mongoServiceName);
 var mongoCredentials = appEnv.getServiceCreds(mongoServiceName);
 var mongoUrl = mongoCredentials.uri;
