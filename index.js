@@ -8,6 +8,7 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var cfenv = require("cfenv");
 var path = require('path');
+const basicAuth = require('basic-auth');
 
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
