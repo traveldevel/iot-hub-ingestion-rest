@@ -4,11 +4,16 @@
 require('dotenv').config();
 
 // required modules
-var express = require('express');
-var bodyParser = require('body-parser');
-var cfenv = require("cfenv");
-var path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cfenv = require("cfenv");
+const path = require('path');
 const basicAuth = require('basic-auth');
+
+// Kafka configuration
+const kafka = require('kafka-node');
+const Producer = kafka.Producer;
+const KeyedMessage = kafka.KeyedMessage;
 
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
@@ -25,42 +30,6 @@ var kafkaHost = process.env.KAFKA_HOST;
 var kafkaPort = process.env.KAFKA_PORT;
 
 var tenantNameMongoName = tenantName + "_raw_data";
-
-// mongo connect and create missing collections
-var mongoServiceName = "iot_hub_mongo_" + landscapeName;
-var mongoService = appEnv.getService(mongoServiceName);
-var mongoCredentials = appEnv.getServiceCreds(mongoServiceName);
-var mongoUrl = mongoCredentials.uri;
-var mongoClient = require('mongodb').MongoClient;
-
-console.log(mongoServiceName + " found in VCAP_SERVICES");
-console.log(mongoService.credentials);
-
-var mongoDbName = '';
-var mongoUrl = '';
-
-if(mongoService !== undefined){
-
-    mongoUrl = mongoService.credentials.uri + "?ssl=false";
-
-    var mongodbUri = require('mongodb-uri');
-    var uriObject = mongodbUri.parse(mongoUrl);
-    mongoDbName = uriObject.database;
-}
-
-console.log("Mongo url : ", mongoUrl);
-console.log("Mongo db : ", mongoDbName);
-
-mongoClient.connect(mongoUrl, function(err, mongoDb) {
-    
-    console.log("Connected to mongo...");
-
-    var cPromise = mongoDb.collections();
-    cPromise.then(function(collections){
-        var colNames = collections.map(c => c.s.name);
-        console.log("Collections : ", colNames);
-    });
-});
 
 const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
 const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
@@ -91,16 +60,38 @@ var fnSaveDataFor = function(req, res){
     var deviceId = req.params.deviceId;
     var values = req.body;
 
-    var all = {
+    var message = {
         "device_id" : deviceId,
         "receive_time": new Date(),
         "values" : values
     };
 
-    // write to kafka <tenant_name>_raw_data
-    // TO DO
+    // write to kafka <lansdcape_name>-<tenant_name>-raw-data
+    var client = new kafka.Client(kafkaHost + ":" + kafkaPort);
+    //var client = new kafka.KafkaClient(kafkaHost);
+    
+    var producer = new Producer(client, { requireAcks: 1 });
+    
+    var kMessage = new KeyedMessage(deviceId, JSON.stringify(message));
 
-    res.json(all);
+    var payloads = [
+        { 
+            topic: process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data",
+            messages: kMessage, 
+            partition: 0 
+        }
+    ];
+
+    producer.on('ready', function () {
+        producer.send(payloads, function (err, data) {
+            console.log(data);
+            res.end("OK : ", JSON.stringify(data));
+        });    
+    });
+
+    producer.on('error', function (err) {
+        res.end("Error : ", JSON.stringify(err));
+    });
 };  
 
 // new express app
@@ -128,21 +119,7 @@ app.put('/save/data/for/:deviceId', auth, fnSaveDataFor);
 
 // respond with collections on GET /
 app.get('/', auth, function (req, res) {
-
-    mongoClient.connect(mongoUrl, function(err, mongoDb) {
-        
-        console.log("Connected to mongo");
-       
-        mongoDb.collections().then(function(cols){
-            
-            var cols = cols.map(col => col.s.name);
-            console.log("Collections at start :", cols);
-
-            mongoDb.close();
-
-            res.send(cols);
-        });
-    });
+    res.end("Pong");
 });
 
 // app listen
