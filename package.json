@@ -39,6 +39,7 @@
     "mocha": "^3.5.0",
     "mongodb": "^2.2.31",
     "mongodb-uri": "^0.9.7",
+    "node-zookeeper-client": "^0.2.2",
     "querystring": "^0.2.0",
     "request": "^2.81.0",
     "request-promise": "^4.2.1"

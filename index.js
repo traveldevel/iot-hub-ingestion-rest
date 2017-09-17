@@ -18,8 +18,11 @@ if(!appEnv.isLocal){
     console.log("appEnv.isLocal=", appEnv.isLocal);
 }
 
+const port = process.env.PORT || 8080;
 var landscapeName = process.env.LANDSCAPE_NAME;
 var tenantName = process.env.TENANT_NAME;
+var kafkaHost = process.env.KAFKA_HOST;
+var kafkaPort = process.env.KAFKA_PORT;
 
 var tenantNameMongoName = tenantName + "_raw_data";
 
@@ -82,6 +85,24 @@ const auth = function (req, res, next) {
     };
 };
 
+// handle POST / PUT / GET for saving data
+var fnSaveDataFor = function(req, res){
+
+    var deviceId = req.params.deviceId;
+    var values = req.body;
+
+    var all = {
+        "device_id" : deviceId,
+        "receive_time": new Date(),
+        "values" : values
+    };
+
+    // write to kafka <tenant_name>_raw_data
+    // TO DO
+
+    res.json(all);
+};  
+
 // new express app
 var app = express();
 
@@ -96,26 +117,35 @@ app.use(bodyParser.json());
 // swagger ui for api is static resource
 app.use('/swagger', express.static(path.join(__dirname, 'swagger')));
 
-// ingest respond back
-app.get('/save/data/for/:deviceId', auth, function (req, res) {
-    res.send(req.params);
-});
+// ingest data GET
+app.get('/save/data/for/:deviceId', auth, fnSaveDataFor);
 
-// ingest respond back
+// ingest data POST
+app.post('/save/data/for/:deviceId', auth, fnSaveDataFor);
+
+// ingest data PUT
+app.put('/save/data/for/:deviceId', auth, fnSaveDataFor);
+
+// respond with collections on GET /
 app.get('/', auth, function (req, res) {
 
     mongoClient.connect(mongoUrl, function(err, mongoDb) {
         
         console.log("Connected to mongo");
        
-        var collections = mongoDb.collections();
-        mongoDb.close();
+        mongoDb.collections().then(function(cols){
+            
+            var cols = cols.map(col => col.s.name);
+            console.log("Collections at start :", cols);
 
-        res.send(collections);
+            mongoDb.close();
+
+            res.send(cols);
+        });
     });
 });
 
 // app listen
-app.listen(8080, function () {
+app.listen(port, function () {
     console.log('REST API listening on ' + appEnv.url + ':' + process.env.PORT);
 });
