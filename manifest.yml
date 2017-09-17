@@ -1,9 +1,8 @@
 applications:
- - name: iot-hub-ingestion-rest-shared
+ - name: iot-hub-ingestion-rest-shared-new
    memory: 64M
    disk_quota: 128M
-   instances: 2
+   instances: 1
    buildpack: https://github.com/cloudfoundry/nodejs-buildpack
-   env:
-    landscapeName: shared
-    tenantName: own
+   services:
+    - iot_hub_mongo_shared   
