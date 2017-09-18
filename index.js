@@ -11,9 +11,9 @@ const path = require('path');
 const basicAuth = require('basic-auth');
 
 // Kafka configuration
-const kafka = require('kafka-node');
-const Producer = kafka.Producer;
-const KeyedMessage = kafka.KeyedMessage;
+const kafka = require('node-rdkafka');
+console.log("version : ", kafka.librdkafkaVersion);
+console.log("features : ", kafka.features);
 
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
@@ -54,6 +54,22 @@ const auth = function (req, res, next) {
     };
 };
 
+function getKafkaHostsFromEnv(){
+    var hosts = process.env.KAFKA_HOST1 + ':' + process.env.KAFKA_HOST1;
+    
+    if(process.env.KAFKA_HOST2 !== undefined && process.env.KAFKA_PORT2 != undefined){
+        hosts += "," + process.env.KAFKA_HOST2 + ':' + process.env.KAFKA_HOST2;
+    }
+    
+    if(process.env.KAFKA_HOST3 !== undefined && process.env.KAFKA_PORT3 != undefined){
+        hosts += "," + process.env.KAFKA_HOST3 + ':' + process.env.KAFKA_HOST3;
+    }
+
+    console.log("kafka hosts : ", hosts);
+
+    return hosts;
+}
+
 // handle POST / PUT / GET for saving data
 var fnSaveDataFor = function(req, res){
 
@@ -66,32 +82,43 @@ var fnSaveDataFor = function(req, res){
         "values" : values
     };
 
+    // data to be written
+    var topicName = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data";
+    var sKey = deviceId;
+    var sMessage = JSON.stringify(message);
+    var partition = -1;
+
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
-    var client = new kafka.Client(kafkaHost + ":" + kafkaPort);
-    //var client = new kafka.KafkaClient(kafkaHost);
-    
-    var producer = new Producer(client, { requireAcks: 1 });
-    
-    var kMessage = new KeyedMessage(deviceId, JSON.stringify(message));
+    var producer = new kafka.Producer({
+        'metadata.broker.list': getKafkaHostsFromEnv(),
+        'dr_cb': true
+    });
 
-    var payloads = [
-        { 
-            topic: process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data",
-            messages: kMessage, 
-            partition: 0 
+    producer.on('ready', function() {
+        try {
+            producer.produce(
+                topicName,
+                null,
+                new Buffer(sMessage),
+                deviceId,
+                Date.now()
+            );
+        } catch (err) {
+            console.error('A problem occurred when sending kafka message...');
+            console.error(err);
         }
-    ];
 
-    producer.on('ready', function () {
-        producer.send(payloads, function (err, data) {
-            console.log(data);
-            res.end("OK : ", JSON.stringify(data));
-        });    
+        producer.disconnect();
+    });
+       
+    // Any errors we encounter, including connection errors
+    producer.on('event.error', function(err) {
+        console.error('Error from producer...');
+        console.error(err);
     });
 
-    producer.on('error', function (err) {
-        res.end("Error : ", JSON.stringify(err));
-    });
+    // connect after all events are defined
+    producer.connect();
 };  
 
 // new express app
