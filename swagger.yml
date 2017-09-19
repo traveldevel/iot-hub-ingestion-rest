@@ -32,6 +32,8 @@ paths:
           type: string  
         - in: body
           name: values
+          required: true
+          type: string          
           description: json serialized array of values for data ingestion [{"p1":"v1"}, {..}, ..]
       responses:
         200: 
@@ -46,7 +48,7 @@ paths:
           description: Forbidden, No auth header send    
         404:
           description: Invalid deviceId      
-        '405':
+        405:
           description: Invalid body (data for ingestion)        
 externalDocs:
   description: Find out more about Swagger
