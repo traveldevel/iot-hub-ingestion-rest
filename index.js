@@ -9,11 +9,17 @@ const bodyParser = require('body-parser');
 const cfenv = require("cfenv");
 const path = require('path');
 const basicAuth = require('basic-auth');
+const fs = require('fs');
 
 // Kafka configuration
 const kafka = require('node-rdkafka');
 console.log("version : ", kafka.librdkafkaVersion);
 console.log("features : ", kafka.features);
+
+//extract certificate files from env to filesystem
+fs.writeFileSync("/tmp/kafka.ca", process.env.KAFKA_CA);
+fs.writeFileSync("/tmp/kafka.crt", process.env.KAFKA_CERT);
+fs.writeFileSync("/tmp/kafka.key", process.env.KAFKA_PRIVATE_KEY);
 
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
@@ -26,8 +32,6 @@ if(!appEnv.isLocal){
 const port = process.env.PORT || 8080;
 var landscapeName = process.env.LANDSCAPE_NAME;
 var tenantName = process.env.TENANT_NAME;
-var kafkaHost = process.env.KAFKA_HOST;
-var kafkaPort = process.env.KAFKA_PORT;
 
 var tenantNameMongoName = tenantName + "_raw_data";
 
@@ -55,14 +59,15 @@ const auth = function (req, res, next) {
 };
 
 function getKafkaHostsFromEnv(){
-    var hosts = process.env.KAFKA_HOST1 + ':' + process.env.KAFKA_HOST1;
+
+    var hosts = process.env.KAFKA_HOST1 + ':' + process.env.KAFKA_PORT1;
     
     if(process.env.KAFKA_HOST2 !== undefined && process.env.KAFKA_PORT2 != undefined){
-        hosts += "," + process.env.KAFKA_HOST2 + ':' + process.env.KAFKA_HOST2;
+        hosts += ',' + process.env.KAFKA_HOST2 + ':' + process.env.KAFKA_PORT2;
     }
     
     if(process.env.KAFKA_HOST3 !== undefined && process.env.KAFKA_PORT3 != undefined){
-        hosts += "," + process.env.KAFKA_HOST3 + ':' + process.env.KAFKA_HOST3;
+        hosts += ',' + process.env.KAFKA_HOST3 + ':' + process.env.KAFKA_PORT3;
     }
 
     console.log("kafka hosts : ", hosts);
@@ -87,11 +92,16 @@ var fnSaveDataFor = function(req, res){
     var sKey = deviceId;
     var sMessage = JSON.stringify(message);
     var partition = -1;
+    console.log("To send : ", topicName, partition, sKey, sMessage);
 
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
     var producer = new kafka.Producer({
         'metadata.broker.list': getKafkaHostsFromEnv(),
-        'dr_cb': true
+        'dr_cb': true,
+        'ssl.ca.location' : '/tmp/kafka.ca',
+        'ssl.certificate.location': '/tmp/kafka.crt"',
+        'ssl.key.location': '/tmp/kafka.key',
+        'security.protocol': 'ssl'
     });
 
     producer.on('ready', function() {
@@ -106,15 +116,18 @@ var fnSaveDataFor = function(req, res){
         } catch (err) {
             console.error('A problem occurred when sending kafka message...');
             console.error(err);
+            res.json(err);
         }
 
         producer.disconnect();
+        res.end("OK");
     });
        
     // Any errors we encounter, including connection errors
     producer.on('event.error', function(err) {
         console.error('Error from producer...');
         console.error(err);
+        res.json(err);
     });
 
     // connect after all events are defined
