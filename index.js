@@ -16,11 +16,6 @@ const kafka = require('node-rdkafka');
 console.log("version : ", kafka.librdkafkaVersion);
 console.log("features : ", kafka.features);
 
-//extract certificate files from env to filesystem
-fs.writeFileSync("/tmp/kafka.ca", process.env.KAFKA_CA);
-fs.writeFileSync("/tmp/kafka.crt", process.env.KAFKA_CERT);
-fs.writeFileSync("/tmp/kafka.key", process.env.KAFKA_PRIVATE_KEY);
-
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
 //console.log(appEnv.getServices());
@@ -96,12 +91,9 @@ var fnSaveDataFor = function(req, res){
 
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
     var producer = new kafka.Producer({
-        'metadata.broker.list': getKafkaHostsFromEnv(),
-        'dr_cb': true,
-        'ssl.ca.location' : '/tmp/kafka.ca',
-        'ssl.certificate.location': '/tmp/kafka.crt"',
-        'ssl.key.location': '/tmp/kafka.key',
-        'security.protocol': 'ssl'
+        'metadata.broker.list' : getKafkaHostsFromEnv(),
+        'dr_cb' : true,
+        'debug' : 'all'
     });
 
     producer.on('ready', function() {
@@ -109,17 +101,17 @@ var fnSaveDataFor = function(req, res){
             producer.produce(
                 topicName,
                 null,
-                new Buffer(sMessage),
-                deviceId,
-                Date.now()
+                Message,
+                deviceId
             );
         } catch (err) {
             console.error('A problem occurred when sending kafka message...');
             console.error(err);
-            res.json(err);
+            res.write(JSON.stringify(err));
         }
 
         producer.disconnect();
+
         res.end("OK");
     });
        
@@ -127,7 +119,21 @@ var fnSaveDataFor = function(req, res){
     producer.on('event.error', function(err) {
         console.error('Error from producer...');
         console.error(err);
-        res.json(err);
+        res.write(JSON.stringify(err));
+    });
+
+    producer.on('event.log', function(log) {
+        console.log(log);
+        res.write(JSON.stringify(log));
+    });
+
+    producer.on('delivery-report', function(err, report) {
+        console.log('delivery-report: ' + JSON.stringify(report));
+        res.write(JSON.stringify(report));
+    });
+
+    producer.on('disconnected', function(arg) {
+        console.log('producer disconnected. ' + JSON.stringify(arg));
     });
 
     // connect after all events are defined
@@ -164,5 +170,5 @@ app.get('/', auth, function (req, res) {
 
 // app listen
 app.listen(port, function () {
-    console.log('REST API listening on ' + appEnv.url + ':' + process.env.PORT);
+    console.log('REST API listening on ' + appEnv.url + ':' + port);
 });
