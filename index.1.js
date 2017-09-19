@@ -12,7 +12,7 @@ const basicAuth = require('basic-auth');
 const fs = require('fs');
 
 // Kafka configuration
-const kafka = require('node-rdkafka');
+var kafka = require('node-rdkafka');
 console.log("version : ", kafka.librdkafkaVersion);
 console.log("features : ", kafka.features);
 
@@ -28,10 +28,10 @@ const port = process.env.PORT || 8080;
 var landscapeName = process.env.LANDSCAPE_NAME;
 var tenantName = process.env.TENANT_NAME;
 
-var tenantNameMongoName = tenantName + "_raw_data";
-
 const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
 const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
+
+console.log(process.env.CLOUDKARAFKA_CA);
 
 fs.writeFileSync("/tmp/kafka.ca", process.env.CLOUDKARAFKA_CA); 
 fs.writeFileSync("/tmp/kafka.crt", process.env.CLOUDKARAFKA_CERT);
@@ -69,7 +69,7 @@ function getKafkaHostsFromEnv(){
         hosts += ',' + process.env.KAFKA_HOST3 + ':' + process.env.KAFKA_PORT3;
     }
 
-    console.log("kafka hosts : ", hosts);
+    //console.log("kafka hosts : ", hosts);
 
     return hosts;
 }
@@ -95,39 +95,54 @@ var fnSaveDataFor = function(req, res){
 
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
     var producer = new kafka.Producer({
+        'client.id': 'producer-' + landscapeName + "-" + tenantName,
         'metadata.broker.list' : getKafkaHostsFromEnv(),
-        'dr_cb' : true,
         'debug' : 'all',
-        'ssl.ca.location' : '/tmp/kafka.ca',
+        'ssl.ca.location': '/tmp/kafka.ca',
         'ssl.certificate.location' : '/tmp/kafka.crt',
         'ssl.key.location' : '/tmp/kafka.key',
-        'security.protocol' : 'ssl'
+        'security.protocol' : 'ssl',
+        'request.required.acks': 1,
+        'dr_cb' : true,
+        'socket.keepalive.enable': true,
+        "api.version.request": true,
+        "socket.timeout.ms": 5000
     });
 
+    producer.setPollInterval(100);
+
     producer.on('ready', function() {
-        try {
-            producer.produce(
-                topicName,
-                null,
-                Message,
-                deviceId
-            );
-        } catch (err) {
-            console.error('A problem occurred when sending kafka message...');
-            console.error(err);
-            res.write(JSON.stringify(err));
-        }
 
-        producer.disconnect();
+        console.log('producer ready !');
 
-        res.end("OK");
+        producer.produce(topicName, partition, sMessage, sKey);
+
+        producer.flush(1, function(res){
+            console.log(" flush : ", res);
+        });
+
+        producer.poll();
     });
        
     // Any errors we encounter, including connection errors
+    producer.on('error', function(code, err) {
+        console.error('Error : ');
+        console.error(code, err);
+        res.write(JSON.stringify(err));
+        res.end();
+        producer.disconnect();
+    });
+    
+    producer.on('event', function(log) {
+        console.log('event : ', log);
+    });
+
     producer.on('event.error', function(err) {
         console.error('Error from producer...');
         console.error(err);
         res.write(JSON.stringify(err));
+        res.end();
+        producer.disconnect();
     });
 
     producer.on('event.log', function(log) {
@@ -135,17 +150,21 @@ var fnSaveDataFor = function(req, res){
         res.write(JSON.stringify(log));
     });
 
-    producer.on('delivery-report', function(err, report) {
-        console.log('delivery-report: ' + JSON.stringify(report));
-        res.write(JSON.stringify(report));
-    });
-
     producer.on('disconnected', function(arg) {
         console.log('producer disconnected. ' + JSON.stringify(arg));
     });
 
+    producer.on('delivery-report', function(err, report) {
+        console.log('delivery-report: ' + JSON.stringify(report));
+        res.write(JSON.stringify(report));
+        res.end();
+        producer.disconnect();
+    });    
+
     // connect after all events are defined
-    producer.connect();
+    producer.connect(function(err){
+        console.log('connect err :', err);
+    });
 };  
 
 // new express app
