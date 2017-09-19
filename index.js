@@ -151,6 +151,12 @@ var fnSaveDataFor = function(req, res){
 // new express app
 var app = express();
 
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load('swagger.yml');
+ 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({
     extended: true
@@ -158,12 +164,6 @@ app.use(bodyParser.urlencoded({
 
 // parse application/json
 app.use(bodyParser.json());
-
-// swagger ui for api is static resource
-app.use('/swagger', express.static(path.join(__dirname, 'swagger')));
-
-// ingest data GET
-app.get('/save/data/for/:deviceId', auth, fnSaveDataFor);
 
 // ingest data POST
 app.post('/save/data/for/:deviceId', auth, fnSaveDataFor);

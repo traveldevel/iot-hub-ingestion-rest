@@ -1,0 +1,40 @@
+swagger: '2.0'
+info:
+  description: Ingestion REST API desc
+  version: 1.0.0
+  title: IoT Hub Ingestion REST API
+  contact:
+    email: traveldevel@hotmail.com
+host: iot-hub-ingestion-rest-shared-new.cfapps.io
+basePath: /
+tags:
+  - name: ingestion
+    description: Data ingestion
+schemes:
+  - http
+paths:
+  /save/data/for/{deviceId}:
+    post:
+      tags:
+        - ingestion
+      summary: Data ingestion (JSON body)
+      description: ''
+      operationId: saveDataForDevice
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: path
+          name: deviceId
+          description: deviceId for data ingestion
+          required: true
+          type: string
+      responses:
+        '404':
+          description: Invalid deviceId      
+        '405':
+          description: Invalid body (data for ingestion)
+externalDocs:
+  description: Find out more about Swagger
+  url: 'http://swagger.io'
