@@ -24,19 +24,30 @@ paths:
         - application/json
       produces:
         - application/json
-      parameters:
+      parameters:  
         - in: path
           name: deviceId
           description: deviceId for data ingestion
           required: true
-          type: string
+          type: string  
         - in: body
-          description: device data serialized as json array, example [{"prop1": "val1"},{"prop2": "val2"}..]
+          name: values
+          description: json serialized array of values for data ingestion [{"p1":"v1"}, {..}, ..]
       responses:
-        '404':
+        200: 
+          description: Successful response
+          schema:
+              title: Return String
+              type: string
+              example: "OK"
+        401:
+          description: Unauthorized, No auth header send   
+        403:
+          description: Forbidden, No auth header send    
+        404:
           description: Invalid deviceId      
         '405':
-          description: Invalid body (data for ingestion)
+          description: Invalid body (data for ingestion)        
 externalDocs:
   description: Find out more about Swagger
   url: 'http://swagger.io'
