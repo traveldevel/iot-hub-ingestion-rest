@@ -30,6 +30,8 @@ paths:
           description: deviceId for data ingestion
           required: true
           type: string
+        - in: body
+          description: device data serialized as json array, example [{"prop1": "val1"},{"prop2": "val2"}..]
       responses:
         '404':
           description: Invalid deviceId      
