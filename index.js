@@ -90,14 +90,13 @@ var fnSaveDataFor = function(req, res){
     var Producer = kafka.Producer;
     var producer = new Producer(client, { requireAcks: 1 });
 
-    producer.on('ready', function(ready) {
+    producer.on('ready', function() {
         
         console.log('kafka producer ready...');
-        console.log(ready);
 
         var KeyedMessage = kafka.KeyedMessage;
 
-        var keyedMessage = new KeyedMessage(deviceId, 'test');
+        var keyedMessage = new KeyedMessage(deviceId, sMessage);
         
         producer.send([
             { 
