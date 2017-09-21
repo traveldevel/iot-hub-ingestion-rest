@@ -12,9 +12,7 @@ const basicAuth = require('basic-auth');
 const fs = require('fs');
 
 // Kafka configuration
-const kafka = require('node-rdkafka');
-console.log("version : ", kafka.librdkafkaVersion);
-console.log("features : ", kafka.features);
+const kafka = require('kafka-node');
 
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
@@ -32,10 +30,6 @@ var tenantNameMongoName = tenantName + "_raw_data";
 
 const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
 const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
-
-fs.writeFileSync("/tmp/kafka.ca", process.env.CLOUDKARAFKA_CA); 
-fs.writeFileSync("/tmp/kafka.crt", process.env.CLOUDKARAFKA_CERT);
-fs.writeFileSync("/tmp/kafka.key", process.env.CLOUDKARAFKA_PRIVATE_KEY);
 
 // auth global function
 const auth = function (req, res, next) {
@@ -57,24 +51,16 @@ const auth = function (req, res, next) {
     };
 };
 
-function getKafkaHostsFromEnv(){
+function getZookeeperFromEnv(){
 
-    var hosts = process.env.KAFKA_HOST1 + ':' + process.env.KAFKA_PORT1;
-    
-    if(process.env.KAFKA_HOST2 !== undefined && process.env.KAFKA_PORT2 != undefined){
-        hosts += ',' + process.env.KAFKA_HOST2 + ':' + process.env.KAFKA_PORT2;
-    }
-    
-    if(process.env.KAFKA_HOST3 !== undefined && process.env.KAFKA_PORT3 != undefined){
-        hosts += ',' + process.env.KAFKA_HOST3 + ':' + process.env.KAFKA_PORT3;
-    }
+    var host = process.env.ZOOKEEPER_HOST + ':' + process.env.ZOOKEEPER_PORT;
 
-    console.log("kafka hosts : ", hosts);
+    console.log("zookeeper hosts : ", host);
 
-    return hosts;
+    return host;
 }
 
-// handle POST / PUT / GET for saving data
+// handle POST / PUT for saving data
 var fnSaveDataFor = function(req, res){
 
     var deviceId = req.params.deviceId;
@@ -90,62 +76,58 @@ var fnSaveDataFor = function(req, res){
     var topicName = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data";
     var sKey = deviceId;
     var sMessage = JSON.stringify(message);
-    var partition = -1;
-    console.log("To send : ", topicName, partition, sKey, sMessage);
+    var part = -1;
+    console.log("To send : ", topicName, part, sKey, sMessage);
 
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
-    var producer = new kafka.Producer({
-        'metadata.broker.list' : getKafkaHostsFromEnv(),
-        'dr_cb' : true,
-        'debug' : 'all',
-        'ssl.ca.location' : '/tmp/kafka.ca',
-        'ssl.certificate.location' : '/tmp/kafka.crt',
-        'ssl.key.location' : '/tmp/kafka.key',
-        'security.protocol' : 'ssl'
-    });
+    var Client = kafka.Client;
+    var client = new Client(getZookeeperFromEnv());
 
-    producer.on('ready', function() {
-        try {
-            producer.produce(
-                topicName,
-                null,
-                Message,
-                deviceId
-            );
-        } catch (err) {
-            console.error('A problem occurred when sending kafka message...');
-            console.error(err);
-            res.write(JSON.stringify(err));
-        }
+    client.once('connect', function () {
+        console.log('kafka client connected');
+    });    
 
-        producer.disconnect();
+    var Producer = kafka.Producer;
+    var producer = new Producer(client, { requireAcks: 1 });
 
-        res.end("OK");
+    producer.on('ready', function(ready) {
+        
+        console.log('kafka producer ready...');
+        console.log(ready);
+
+        var KeyedMessage = kafka.KeyedMessage;
+
+        var keyedMessage = new KeyedMessage(deviceId, 'test');
+        
+        producer.send([
+            { 
+                topic: topicName, 
+                partition: part, 
+                messages: [keyedMessage]
+            }
+          ], 
+          function (err, result) {
+            
+            if(err){
+                console.log(err); 
+            }
+
+            res.json(result);
+            res.end();
+
+            producer.close();
+            client.close();
+          });
     });
        
-    // Any errors we encounter, including connection errors
-    producer.on('event.error', function(err) {
-        console.error('Error from producer...');
-        console.error(err);
-        res.write(JSON.stringify(err));
-    });
+    producer.on('error', function (err) {
+        console.log('kafka error : ', err);
+        res.json(err);
+        res.end();
 
-    producer.on('event.log', function(log) {
-        console.log(log);
-        res.write(JSON.stringify(log));
+        producer.close();
+        client.close();        
     });
-
-    producer.on('delivery-report', function(err, report) {
-        console.log('delivery-report: ' + JSON.stringify(report));
-        res.write(JSON.stringify(report));
-    });
-
-    producer.on('disconnected', function(arg) {
-        console.log('producer disconnected. ' + JSON.stringify(arg));
-    });
-
-    // connect after all events are defined
-    producer.connect();
 };  
 
 // new express app
