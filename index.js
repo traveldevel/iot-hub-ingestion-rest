@@ -58,7 +58,7 @@ function getZookeeperFromEnv(){
 
     var host = process.env.ZOOKEEPER_HOST + ':' + process.env.ZOOKEEPER_PORT;
 
-    console.log("zookeeper hosts : ", host);
+    //console.log("zookeeper hosts : ", host);
 
     return host;
 }
@@ -79,20 +79,16 @@ var fnSaveDataFor = function(req, res){
     var topicName = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data";
     var sKey = deviceId;
     var sMessage = JSON.stringify(message);
-    console.log("To send : ", topicName, sKey, sMessage);
+    //console.log("To send : ", topicName, sKey, sMessage);
 
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
     var client = new Client(getZookeeperFromEnv());
-
-    client.once('connect', function () {
-        console.log('kafka client connected');
-    });    
 
     var producer = new Producer(client);
 
     producer.on('ready', function() {
         
-        console.log('kafka producer ready...');
+        //console.log('kafka producer ready...');
 
         var KeyedMessage = kafka.KeyedMessage;
 
@@ -107,12 +103,13 @@ var fnSaveDataFor = function(req, res){
         function (err, result) {
             
             if(err){
-                console.log('send err received : ', err); 
                 keyedMessage.status = err;
+                console.log('Send err : ', err); 
             }
 
             if(result[topicName]){
                 keyedMessage.status = 'OK';
+                console.log('Sent OK :', keyedMessage); 
             }
 
             res.json(keyedMessage);    
