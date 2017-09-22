@@ -71,7 +71,7 @@ var fnSaveDataFor = function(req, res){
 
     var message = {
         "device_id" : deviceId,
-        "receive_time": new Date(),
+        "receive_time": new Date().toISOString(),
         "values" : values
     };
 
