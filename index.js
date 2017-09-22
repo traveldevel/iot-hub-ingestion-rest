@@ -31,6 +31,9 @@ var tenantNameMongoName = tenantName + "_raw_data";
 const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
 const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
 
+var Client = kafka.Client;
+var Producer = kafka.Producer;
+
 // auth global function
 const auth = function (req, res, next) {
     function unauthorized(res) {
@@ -76,19 +79,16 @@ var fnSaveDataFor = function(req, res){
     var topicName = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data";
     var sKey = deviceId;
     var sMessage = JSON.stringify(message);
-    var part = -1;
-    console.log("To send : ", topicName, part, sKey, sMessage);
+    console.log("To send : ", topicName, sKey, sMessage);
 
     // write to kafka <lansdcape_name>-<tenant_name>-raw-data
-    var Client = kafka.Client;
     var client = new Client(getZookeeperFromEnv());
 
     client.once('connect', function () {
         console.log('kafka client connected');
     });    
 
-    var Producer = kafka.Producer;
-    var producer = new Producer(client, { requireAcks: 1 });
+    var producer = new Producer(client);
 
     producer.on('ready', function() {
         
@@ -101,25 +101,30 @@ var fnSaveDataFor = function(req, res){
         producer.send([
             { 
                 topic: topicName, 
-                partition: part, 
                 messages: [keyedMessage]
             }
-          ], 
-          function (err, result) {
+        ], 
+        function (err, result) {
             
             if(err){
-                console.log(err); 
+                console.log('send err received : ', err); 
+                keyedMessage.status = err;
             }
 
-            res.json(result);
+            if(result[topicName]){
+                keyedMessage.status = 'OK';
+            }
+
+            res.json(keyedMessage);    
             res.end();
 
             producer.close();
             client.close();
-          });
+        });
     });
        
     producer.on('error', function (err) {
+
         console.log('kafka error : ', err);
         res.json(err);
         res.end();
