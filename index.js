@@ -26,8 +26,6 @@ const port = process.env.PORT || 8080;
 var landscapeName = process.env.LANDSCAPE_NAME;
 var tenantName = process.env.TENANT_NAME;
 
-var tenantNameMongoName = tenantName + "_raw_data";
-
 const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
 const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
 
@@ -81,7 +79,7 @@ var fnSaveDataFor = function(req, res){
     var sMessage = JSON.stringify(message);
     //console.log("To send : ", topicName, sKey, sMessage);
 
-    // write to kafka <lansdcape_name>-<tenant_name>-raw-data
+    // write to kafka <landscape_name>-<tenant_name>-raw-data
     var client = new Client(getZookeeperFromEnv());
 
     var producer = new Producer(client);
