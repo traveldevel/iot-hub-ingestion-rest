@@ -61,6 +61,8 @@ function getZookeeperFromEnv(){
     return host;
 }
 
+var zookeeperHost = getZookeeperFromEnv();
+
 // handle POST / PUT for saving data
 var fnSaveDataFor = function(req, res){
 
@@ -74,59 +76,170 @@ var fnSaveDataFor = function(req, res){
     };
 
     // data to be written
-    var topicName = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data";
     var sKey = deviceId;
     var sMessage = JSON.stringify(message);
-    //console.log("To send : ", topicName, sKey, sMessage);
+    //console.log("To send : ", sKey, sMessage);
 
     // write to kafka <landscape_name>-<tenant_name>-raw-data
-    var client = new Client(getZookeeperFromEnv());
+    var saveToKafkaRawData = function(req, res)
+    {
+        var topicName = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-raw-data";
 
-    var producer = new Producer(client);
+        var client = new Client(zookeeperHost);
 
-    producer.on('ready', function() {
-        
-        //console.log('kafka producer ready...');
+        var producer = new Producer(client);
 
-        var KeyedMessage = kafka.KeyedMessage;
-
-        var keyedMessage = new KeyedMessage(deviceId, sMessage);
-        
-        producer.send([
-            { 
-                topic: topicName, 
-                messages: [keyedMessage]
-            }
-        ], 
-        function (err, result) {
+        producer.on('ready', function() {
             
-            if(err){
-                keyedMessage.status = err;
-                console.log('Send err : ', err); 
-            }
+            //console.log('kafka producer ready...');
 
-            if(result[topicName]){
-                keyedMessage.status = 'OK';
-                console.log('Sent OK :', keyedMessage); 
-            }
+            var KeyedMessage = kafka.KeyedMessage;
 
-            res.json(keyedMessage);    
+            var keyedMessage = new KeyedMessage(deviceId, sMessage);
+            
+            // send to raw data
+            producer.send([
+                { 
+                    topic: topicName, 
+                    messages: [keyedMessage]
+                }
+            ], 
+            function (err, result) {
+                
+                if(err){
+                    keyedMessage.status = err;
+                    console.log('Send for raw data err : ', err); 
+                }
+
+                if(result[topicName]){
+                    keyedMessage.status = 'OK';
+                    //console.log('Sent for raw data OK :', keyedMessage); 
+                }
+
+                res.json(keyedMessage);    
+                res.end();
+
+                producer.close();
+                client.close();
+            });
+
+        });
+        
+        producer.on('error', function (err) {
+
+            console.log('kafka error : ', err);
+            res.json(err);
             res.end();
 
             producer.close();
-            client.close();
+            client.close();        
         });
-    });
-       
-    producer.on('error', function (err) {
+    }
 
-        console.log('kafka error : ', err);
-        res.json(err);
-        res.end();
+    // write to kafka <landscape_name>-<tenant_name>-for-event-rules
+    var saveToKafkaEvent = function(req, res)
+    {
+        var clientEvent = new Client(zookeeperHost);
+        
+        var producerEvent = new Producer(clientEvent);
 
-        producer.close();
-        client.close();        
-    });
+        producerEvent.on('ready', function() {
+            
+            //console.log('kafka producer ready...');
+
+            var topicNameEvent = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-for-event-rules";
+
+            var KeyedMessage = kafka.KeyedMessage;
+
+            var keyedMessage = new KeyedMessage(deviceId, sMessage);
+            
+            // send to raw data
+            producerEvent.send([
+                { 
+                    topic: topicNameEvent, 
+                    messages: [keyedMessage]
+                }
+            ], 
+            function (err, result) {
+                
+                if(err){
+                    keyedMessage.status = err;
+                    console.log('Send for raw data err : ', err); 
+                }
+
+                if(result[topicNameEvent]){
+                    //console.log('Sent for raw data OK :', keyedMessage); 
+                }
+
+                producerEvent.close();
+                clientEvent.close();
+            });
+
+        });
+            
+        producerEvent.on('error', function (err) {
+
+            console.log('kafka error : ', err);
+
+            producerEvent.close();
+            clientEvent.close();        
+        });
+    }
+
+    // write to kafka <landscape_name>-<tenant_name>-for-coldstore-history
+    var saveToKafkaColdstore = function(req, res)    
+    {
+        var clientColdstore= new Client(zookeeperHost);
+        
+        var producerColdstore = new Producer(clientColdstore);
+
+        producerColdstore.on('ready', function() {
+            
+            //console.log('kafka producer ready...');
+
+            var topicNameColdstore = process.env.KAFKA_TOPIC_PREFIX + landscapeName + "-" + tenantName + "-for-coldstore-history";
+
+            var KeyedMessage = kafka.KeyedMessage;
+
+            var keyedMessage = new KeyedMessage(deviceId, sMessage);
+            
+            // send to raw data
+            producerColdstore.send([
+                { 
+                    topic: topicNameColdstore, 
+                    messages: [keyedMessage]
+                }
+            ], 
+            function (err, result) {
+                
+                if(err){
+                    keyedMessage.status = err;
+                    console.log('Send for cold store err : ', err); 
+                }
+
+                if(result[topicNameColdstore]){
+                    //console.log('Sent for cold store OK :', keyedMessage); 
+                }
+
+                producerColdstore.close();
+                clientColdstore.close();
+            });
+
+        });
+            
+        producerColdstore.on('error', function (err) {
+
+            console.log('kafka error : ', err);
+            
+            producerColdstore.close();
+            clientColdstore.close();        
+        });  
+    }  
+
+    // start functions to write in Kafka
+    saveToKafkaRawData(req, res);
+    saveToKafkaEvent(req, res);
+    saveToKafkaColdstore(req, res);
 };  
 
 // new express app
